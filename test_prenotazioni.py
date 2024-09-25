@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Sep 25 10:13:32 2024
-
-@author: user
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,10 +6,10 @@ import random
 from datetime import datetime, timedelta
 
 # URL of the initial CSV file hosted on GitHub
-GITHUB_CSV_URL = 'https://github.com/andreapoi/prenotazioni-campo/blob/main/initial_data.csv'
+GITHUB_CSV_URL = 'https://raw.githubusercontent.com/<your-username>/<your-repo-name>/main/initial_data.csv'
 
 # Function to load the initial CSV file from GitHub
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_initial_data():
     return pd.read_csv(GITHUB_CSV_URL, header=[0, 1])  # Load with multi-level columns
 
@@ -94,6 +86,11 @@ def block_predefined_slots(df):
 def generate_fixed_code(length=5):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
+# Function to save the updated DataFrame to CSV
+def save_to_csv(df):
+    # Save the updated DataFrame to a CSV file
+    df.to_csv('updated_data.csv', index=False)
+
 # Initialize the DataFrame in session state
 if 'df' not in st.session_state:
     st.session_state.df = initialize_dataframe()
@@ -141,6 +138,7 @@ def add_reservation():
         if pd.isna(st.session_state.df.at[row_index, selected_day_field]):
             st.session_state.df.at[row_index, selected_day_field] = 'RESERVED'
             st.success(f"Reservation added successfully for {selected_field} on {selected_day} at {selected_period}.")
+            save_to_csv(st.session_state.df)  # Save the updated DataFrame to CSV
         else:
             st.error("Selected time period is already occupied. Please choose another one.")
 
@@ -163,6 +161,7 @@ def delete_block():
             del st.session_state.reservation_codes[block_code]
             
             st.success("Block removed successfully!")
+            save_to_csv(st.session_state.df)  # Save the updated DataFrame to CSV
         else:
             st.error("Invalid block code. Please try again.")
 
@@ -183,13 +182,13 @@ def display_dataframes():
         else:
             return 'background-color: yellow;'  # Reserved by a normal submission
 
-    # Display Campo 1 DataFrame
+    # Display Campo 1 DataFrame with time intervals as index
     st.write('### Reservations for Campo 1')
-    st.dataframe(campo1_df.style.applymap(color_cells))
+    st.dataframe(campo1_df.set_index(st.session_state.df[('orario di gioco', '')]).style.applymap(color_cells))
 
-    # Display Campo 2 DataFrame
+    # Display Campo 2 DataFrame with time intervals as index
     st.write('### Reservations for Campo 2')
-    st.dataframe(campo2_df.style.applymap(color_cells))
+    st.dataframe(campo2_df.set_index(st.session_state.df[('orario di gioco', '')]).style.applymap(color_cells))
 
 # Display the DataFrames on app startup
 display_dataframes()
