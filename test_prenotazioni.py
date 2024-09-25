@@ -191,4 +191,11 @@ def display_dataframes():
     st.write('### Reservations for Campo 2')
     st.dataframe(campo2_df.style.applymap(color_cells))
 
-# Display the DataFrames
+# Display the DataFrames on app startup
+display_dataframes()
+
+# Reservation inputs and button
+add_reservation()
+
+# Deletion input and button
+delete_block()
