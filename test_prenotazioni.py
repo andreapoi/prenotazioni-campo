@@ -5,15 +5,15 @@ import string
 import random
 from datetime import datetime, timedelta
 
-# URL of the initial CSV file hosted on GitHub
+# URL del file CSV iniziale ospitato su GitHub
 GITHUB_CSV_URL = 'https://github.com/andreapoi/prenotazioni-campo/blob/main/initial_data.csv'
 
-# Function to load the initial CSV file from GitHub
+# Funzione per caricare il file CSV iniziale da GitHub
 @st.cache(allow_output_mutation=True)
 def load_initial_data():
-    return pd.read_csv(GITHUB_CSV_URL, header=[0, 1])  # Load with multi-level columns
+    return pd.read_csv(GITHUB_CSV_URL, header=[0, 1])  # Carica con colonne multi-livello
 
-# Function to generate time intervals
+# Funzione per generare gli intervalli orari
 def generate_time_intervals(start_time='08:00', end_time='22:00', interval_minutes=90):
     intervals = []
     start = datetime.strptime(start_time, '%H:%M')
@@ -22,45 +22,45 @@ def generate_time_intervals(start_time='08:00', end_time='22:00', interval_minut
     while start + timedelta(minutes=interval_minutes) <= end + timedelta(minutes=interval_minutes):
         next_time = start + timedelta(minutes=interval_minutes)
         intervals.append(f"{start.strftime('%H:%M')} - {next_time.strftime('%H:%M')}")
-        start += timedelta(minutes=30)  # Move the start time by 30 minutes to create overlapping intervals
+        start += timedelta(minutes=30)  # Sposta l'inizio dell'intervallo di 30 minuti per creare intervalli sovrapposti
 
     return intervals
 
-# Function to check for overlapping reservations
+# Funzione per controllare la sovrapposizione delle prenotazioni
 def is_overlapping(existing_interval, new_interval):
-    # Convert time intervals to datetime objects
+    # Converti gli intervalli di tempo in oggetti datetime
     existing_start, existing_end = [datetime.strptime(t.strip(), '%H:%M') for t in existing_interval.split('-')]
     new_start, new_end = [datetime.strptime(t.strip(), '%H:%M') for t in new_interval.split('-')]
     
-    # Check for overlap
+    # Verifica se c'è sovrapposizione
     return not (new_end <= existing_start or new_start >= existing_end)
 
-# Function to initialize a DataFrame if it is not already loaded
+# Funzione per inizializzare un DataFrame se non è già caricato
 def initialize_dataframe():
-    # Load initial data from GitHub
+    # Carica i dati iniziali da GitHub
     try:
         df = load_initial_data()
     except:
-        df = pd.DataFrame()  # If loading fails, create a new DataFrame
+        df = pd.DataFrame()  # Se il caricamento fallisce, crea un nuovo DataFrame
     
-    # Create the correct structure if loading fails or if it's the first run
+    # Crea la struttura corretta se il caricamento fallisce o se è il primo avvio
     if df.empty or ('orario di gioco', '') not in df.columns:
         base_column = ('orario di gioco', '')
         date_columns = [(day, field) for day in [(datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(14)] for field in ['Campo 1', 'Campo 2']]
         columns = [base_column] + date_columns
 
-        # Generate the time intervals
+        # Genera gli intervalli orari
         time_intervals = generate_time_intervals()
 
-        # Create the initial DataFrame with multi-level columns
+        # Crea il DataFrame iniziale con colonne multi-livello
         df = pd.DataFrame(columns=pd.MultiIndex.from_tuples(columns))
-        df[('orario di gioco', '')] = time_intervals  # Populate with time intervals
+        df[('orario di gioco', '')] = time_intervals  # Popola con gli intervalli orari
 
     return df
 
-# Function to block predefined time slots
+# Funzione per bloccare gli intervalli di tempo predefiniti
 def block_predefined_slots(df):
-    # Blocking rules: (Day, Start time, End time, Field)
+    # Regole di blocco: (Giorno, Ora di inizio, Ora di fine, Campo)
     blocking_rules = [
         ('Monday', '15:00', '16:00', 'Campo 1'),
         ('Monday', '19:30', '21:00', 'Campo 1'),
@@ -71,130 +71,130 @@ def block_predefined_slots(df):
     ]
     
     for day_name, start_time, end_time, field in blocking_rules:
-        # Convert day_name to a date
+        # Converti day_name in una data
         for i in range(14):
             current_date = (datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')
             current_day_name = (datetime.now() + timedelta(days=i)).strftime('%A')
             if current_day_name == day_name:
-                # Find the index of the blocked time intervals
+                # Trova l'indice degli intervalli di tempo bloccati
                 for idx, interval in enumerate(df[('orario di gioco', '')]):
                     if is_overlapping(interval, f"{start_time} - {end_time}"):
                         df.at[idx, (current_date, field)] = 'NOT AVAILABLE'
     return df
 
-# Function to generate a fixed-length alphanumeric code
+# Funzione per generare un codice alfanumerico di lunghezza fissa
 def generate_fixed_code(length=5):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-# Function to save the updated DataFrame to CSV
+# Funzione per salvare il DataFrame aggiornato nel CSV
 def save_to_csv(df):
-    # Save the updated DataFrame to a CSV file
+    # Salva il DataFrame aggiornato in un file CSV
     df.to_csv('updated_data.csv', index=False)
 
-# Initialize the DataFrame in session state
+# Inizializza il DataFrame nello stato della sessione
 if 'df' not in st.session_state:
     st.session_state.df = initialize_dataframe()
-    st.session_state.df = block_predefined_slots(st.session_state.df)  # Apply predefined blocks
+    st.session_state.df = block_predefined_slots(st.session_state.df)  # Applica i blocchi predefiniti
 
-# Initialize reservation codes storage
+# Inizializza la memoria per i codici di prenotazione
 if 'reservation_codes' not in st.session_state:
     st.session_state.reservation_codes = {}
 
-# Function to add a reservation to a specific field
+# Funzione per aggiungere una prenotazione a un campo specifico
 def add_reservation():
-    st.write("### Add a Reservation")
+    st.write("### Aggiungi una Prenotazione")
 
-    # Drop-down to select the day
+    # Menu a tendina per selezionare il giorno
     days = [(datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(14)]
-    selected_day = st.selectbox('Select Day for Reservation', options=days)
+    selected_day = st.selectbox('Seleziona il Giorno per la Prenotazione', options=days)
 
-    # Drop-down to select between "Campo 1" and "Campo 2"
-    selected_field = st.selectbox('Select Field for Reservation', options=['Campo 1', 'Campo 2'])
+    # Menu a tendina per selezionare tra "Campo 1" e "Campo 2"
+    selected_field = st.selectbox('Seleziona il Campo per la Prenotazione', options=['Campo 1', 'Campo 2'])
 
-    # Combine the day and field for DataFrame column selection
+    # Combina il giorno e il campo per la selezione della colonna nel DataFrame
     selected_day_field = (selected_day, selected_field)
 
-    # Drop-down to select the available time period
+    # Menu a tendina per selezionare il periodo di tempo disponibile
     available_periods = st.session_state.df[st.session_state.df[selected_day_field].isna()][('orario di gioco', '')]
-    selected_period = st.selectbox('Select Time Period for Reservation', options=available_periods)
+    selected_period = st.selectbox('Seleziona il Periodo di Tempo per la Prenotazione', options=available_periods)
 
-    # Button to add the reservation
-    if st.button('Add Reservation'):
-        # Check if the selected time period is not available
+    # Bottone per aggiungere la prenotazione
+    if st.button('Aggiungi Prenotazione'):
+        # Verifica se il periodo di tempo selezionato non è disponibile
         if selected_period in st.session_state.df[st.session_state.df[selected_day_field] == 'NOT AVAILABLE'][('orario di gioco', '')].values:
-            st.error("Selected time period is not available for reservation. Please choose another one.")
+            st.error("Il periodo di tempo selezionato non è disponibile per la prenotazione. Si prega di scegliere un altro.")
             return
 
-        # Check for overlapping reservations
+        # Verifica la sovrapposizione delle prenotazioni
         for existing_period in st.session_state.df[selected_day_field].dropna():
             if 'BLOCKED' not in existing_period and is_overlapping(existing_period, selected_period):
-                st.error("Selected time period overlaps with an existing reservation. Please choose another one.")
+                st.error("Il periodo di tempo selezionato si sovrappone a una prenotazione esistente. Si prega di scegliere un altro.")
                 return
 
-        # Find the index of the selected period
+        # Trova l'indice del periodo selezionato
         row_index = st.session_state.df[st.session_state.df[('orario di gioco', '')] == selected_period].index[0]
 
-        # Add the reservation
+        # Aggiungi la prenotazione
         if pd.isna(st.session_state.df.at[row_index, selected_day_field]):
             st.session_state.df.at[row_index, selected_day_field] = 'RESERVED'
-            st.success(f"Reservation added successfully for {selected_field} on {selected_day} at {selected_period}.")
-            save_to_csv(st.session_state.df)  # Save the updated DataFrame to CSV
+            st.success(f"Prenotazione aggiunta con successo per {selected_field} il {selected_day} alle {selected_period}.")
+            save_to_csv(st.session_state.df)  # Salva il DataFrame aggiornato nel CSV
         else:
-            st.error("Selected time period is already occupied. Please choose another one.")
+            st.error("Il periodo di tempo selezionato è già occupato. Si prega di scegliere un altro.")
 
-# Function to delete a block using a random code
+# Funzione per eliminare un blocco utilizzando un codice casuale
 def delete_block():
-    st.write("### Delete a Block")
+    st.write("### Elimina una Prenotazione")
 
-    # Input for the random block code to delete
-    block_code = st.text_input('Enter the 5-digit Block Code to Remove')
+    # Input per il codice del blocco da eliminare
+    block_code = st.text_input('Inserisci il Codice del Blocco (5 cifre) per Rimuoverlo')
 
-    # Button to delete the block using the block code
-    if st.button('Delete Block'):
+    # Bottone per eliminare il blocco utilizzando il codice del blocco
+    if st.button('Elimina Prenotazione'):
         if block_code in st.session_state.reservation_codes:
             selected_day_field, row_index = st.session_state.reservation_codes[block_code]
 
-            # Remove the block by setting cells to NaN
+            # Rimuovi il blocco impostando le celle a NaN
             st.session_state.df.at[row_index, selected_day_field] = pd.NA
             
-            # Remove the reservation code from internal storage
+            # Rimuovi il codice di prenotazione dalla memoria interna
             del st.session_state.reservation_codes[block_code]
             
-            st.success("Block removed successfully!")
-            save_to_csv(st.session_state.df)  # Save the updated DataFrame to CSV
+            st.success("Prenotazione rimossa con successo!")
+            save_to_csv(st.session_state.df)  # Salva il DataFrame aggiornato nel CSV
         else:
-            st.error("Invalid block code. Please try again.")
+            st.error("Codice del blocco non valido. Riprova.")
 
-# Function to display the DataFrames for Campo 1 and Campo 2
+# Funzione per visualizzare i DataFrame per Campo 1 e Campo 2
 def display_dataframes():
-    # Separate DataFrames for Campo 1 and Campo 2
+    # DataFrame separati per Campo 1 e Campo 2
     campo1_df = st.session_state.df.xs('Campo 1', level=1, axis=1)
     campo2_df = st.session_state.df.xs('Campo 2', level=1, axis=1)
 
-    # Function to color-code the cells
+    # Funzione per colorare le celle
     def color_cells(val):
         if pd.isna(val):
-            return 'background-color: green;'  # Free cells
+            return 'background-color: white;'  # Celle libere e vuote
         elif 'NOT AVAILABLE' in str(val):
-            return 'background-color: red;'  # Predefined unavailable slots
+            return 'background-color: red;'  # Slot non disponibili
         elif 'BLOCKED' in str(val):
-            return 'background-color: orange;'  # Blocked by specific code
+            return 'background-color: orange;'  # Bloccato da codice specifico
         else:
-            return 'background-color: yellow;'  # Reserved by a normal submission
+            return 'background-color: yellow;'  # Prenotato con una normale prenotazione
 
-    # Display Campo 1 DataFrame with time intervals as index
-    st.write('### Reservations for Campo 1')
+    # Visualizza il DataFrame di Campo 1 con le fasce orarie come indice
+    st.write('### Prenotazioni per Campo 1')
     st.dataframe(campo1_df.set_index(st.session_state.df[('orario di gioco', '')]).style.applymap(color_cells))
 
-    # Display Campo 2 DataFrame with time intervals as index
-    st.write('### Reservations for Campo 2')
+    # Visualizza il DataFrame di Campo 2 con le fasce orarie come indice
+    st.write('### Prenotazioni per Campo 2')
     st.dataframe(campo2_df.set_index(st.session_state.df[('orario di gioco', '')]).style.applymap(color_cells))
 
-# Display the DataFrames on app startup
+# Visualizza i DataFrame all'avvio dell'app
 display_dataframes()
 
-# Reservation inputs and button
+# Inputs per le prenotazioni e bottone
 add_reservation()
 
-# Deletion input and button
+# Inputs per la cancellazione delle prenotazioni e bottone
 delete_block()
