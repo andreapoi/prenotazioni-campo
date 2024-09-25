@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timedelta
 
 # URL of the initial CSV file hosted on GitHub
-GITHUB_CSV_URL = 'https://raw.githubusercontent.com/<your-username>/<your-repo-name>/main/initial_data.csv'
+GITHUB_CSV_URL = 'https://github.com/andreapoi/prenotazioni-campo/blob/main/initial_data.csv'
 
 # Function to load the initial CSV file from GitHub
 @st.cache(allow_output_mutation=True)
